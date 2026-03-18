@@ -19,7 +19,9 @@ class Skill(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('owner', 'name')
+        constraints = [
+            models.UniqueConstraint(fields=['owner', 'name'], name='unique_skill_per_user')
+        ]
 
     def __str__(self):
         return f"{self.name}"
