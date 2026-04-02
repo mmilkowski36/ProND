@@ -215,7 +215,7 @@ def session_message_delete(request, pk, message_id):
 def cancel_session(request, session_id):
     session = get_object_or_404(Session, id=session_id)
 
-    if session.creator != request.user:
+    if session.host != request.user:
         return HttpResponseForbidden("You cannot cancel this session.")
 
     session.is_cancelled = True
