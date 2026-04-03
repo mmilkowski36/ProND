@@ -5,12 +5,12 @@
 {% block content %}
 <h2>Edit Profile</h2>
 
-<h4>Bio</h4>
-<form method="post">
+<h4>Bio &amp; Photo</h4>
+<form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <input type="hidden" name="action" value="save_bio">
     {{ profile_form.as_p }}
-    <button type="submit" class="btn btn-primary">Save Bio</button>
+    <button type="submit" class="btn btn-primary">Save</button>
 </form>
 
 <hr>

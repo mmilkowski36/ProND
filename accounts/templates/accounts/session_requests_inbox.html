@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Session Requests — ProND{% endblock %}
+
+{% block content %}
+<h2>Session Requests</h2>
+<p class="text-muted">People who want you to host a session for one of your skills.</p>
+
+{% if incoming %}
+<div class="list-group">
+    {% for sr in incoming %}
+    <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+                <strong>
+                    <a href="{% url 'profile_detail' sr.requester.id %}">{{ sr.requester.get_full_name|default:sr.requester.username }}</a>
+                </strong>
+                wants a session on <span class="badge bg-primary">{{ sr.skill.name }}</span>
+                <div class="text-muted small mt-1">{{ sr.created_at|date:"M j, Y" }}</div>
+                {% if sr.message %}
+                <blockquote class="blockquote mt-2 mb-0 fs-6">
+                    <p class="mb-0">"{{ sr.message }}"</p>
+                </blockquote>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2 flex-shrink-0">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="request_id" value="{{ sr.id }}">
+                    <input type="hidden" name="action" value="accept">
+                    <button type="submit" class="btn btn-success btn-sm">Accept</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="request_id" value="{{ sr.id }}">
+                    <input type="hidden" name="action" value="decline">
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Decline</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">No pending requests. Once someone requests a session from you, it will appear here.</p>
+{% endif %}
+{% endblock %}

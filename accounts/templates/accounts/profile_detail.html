@@ -3,7 +3,12 @@
 {% block title %}{{ profile_user.get_full_name|default:profile_user.username }} — ProND{% endblock %}
 
 {% block content %}
-<h2>{{ profile_user.get_full_name|default:profile_user.username }}</h2>
+<div class="d-flex align-items-center gap-3 mb-3">
+    {% if profile and profile.photo %}
+    <img src="{{ profile.photo.url }}" alt="Profile photo" class="rounded-circle" style="width:80px;height:80px;object-fit:cover;">
+    {% endif %}
+    <h2 class="mb-0">{{ profile_user.get_full_name|default:profile_user.username }}</h2>
+</div>
 
 <h4>Bio</h4>
 <p>{{ profile.bio|default:"No bio yet." }}</p>

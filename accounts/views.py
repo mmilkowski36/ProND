@@ -1,11 +1,11 @@
-# hello
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.utils import timezone
-from .models import Profile, Skill
-from .forms import ProfileForm, SkillForm
+from django.db.models import Q
+from .models import Profile, Skill, SessionRequest
+from .forms import ProfileForm, SkillForm, SessionRequestForm
 def login_page(request):
     if request.user.is_authenticated:
         return redirect('session_list')
@@ -34,8 +34,8 @@ def profile_edit(request):  # edit own profile - update bio, add/remove skills
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        if action == 'save_bio': # update bio, profile only
-            profile_form = ProfileForm(request.POST, instance=profile)
+        if action == 'save_bio':
+            profile_form = ProfileForm(request.POST, request.FILES, instance=profile)
             if profile_form.is_valid():
                 profile_form.save()
                 messages.success(request, 'Profile updated.')
@@ -84,4 +84,110 @@ def profile_detail(request, user_id): # view other profile - pretty basic, read 
         'profile_user': profile_user,
         'profile': profile,
         'skills': skills,
+    })
+
+
+@login_required
+def skill_search(request):
+    query = request.GET.get('q', '').strip()
+    results = []  # list of dicts: {skill, owner, profile, has_sessions, my_request}
+
+    if query:
+        skills = (
+            Skill.objects.filter(name__icontains=query)
+            .exclude(owner=request.user)  # don't show own skills
+            .select_related('owner')
+        )
+        # fetch current user's pending requests in bulk
+        my_requests = {
+            sr.skill_id: sr
+            for sr in SessionRequest.objects.filter(
+                requester=request.user,
+                skill__in=skills,
+            )
+        }
+        profiles = {
+            p.user_id: p
+            for p in Profile.objects.filter(user__in=[s.owner for s in skills])
+        }
+        for skill in skills:
+            results.append({
+                'skill': skill,
+                'owner': skill.owner,
+                'profile': profiles.get(skill.owner_id),
+                'has_sessions': skill.has_upcoming_sessions(),
+                'my_request': my_requests.get(skill.id),
+            })
+
+    return render(request, 'accounts/skill_search.html', {
+        'query': query,
+        'results': results,
+    })
+
+
+@login_required
+def session_request_create(request, skill_id):
+    skill = get_object_or_404(Skill, id=skill_id)
+
+    if skill.owner == request.user:
+        messages.error(request, "You can't request a session for your own skill.")
+        return redirect('skill_search')
+
+    if SessionRequest.objects.filter(requester=request.user, skill=skill).exists():
+        messages.error(request, 'You already sent a request for this skill.')
+        return redirect('skill_search')
+
+    if request.method == 'POST':
+        form = SessionRequestForm(request.POST)
+        if form.is_valid():
+            sr = form.save(commit=False)
+            sr.requester = request.user
+            sr.skill = skill
+            sr.save()
+            messages.success(request, f'Request sent to {skill.owner.get_full_name() or skill.owner.username} for "{skill.name}".')
+            return redirect('skill_search')
+    else:
+        form = SessionRequestForm()
+
+    return render(request, 'accounts/session_request_create.html', {
+        'skill': skill,
+        'form': form,
+    })
+
+
+@login_required
+def session_request_cancel(request, request_id):
+    sr = get_object_or_404(SessionRequest, id=request_id, requester=request.user)
+    if request.method == 'POST':
+        sr.delete()
+        messages.success(request, 'Request cancelled.')
+    return redirect('skill_search')
+
+
+@login_required
+def session_requests_inbox(request):
+    # requests sent to the current user (as skill owner)
+    incoming = (
+        SessionRequest.objects
+        .filter(skill__owner=request.user, status=SessionRequest.STATUS_PENDING)
+        .select_related('requester', 'skill')
+        .order_by('-created_at')
+    )
+
+    if request.method == 'POST':
+        sr_id = request.POST.get('request_id')
+        action = request.POST.get('action')
+        sr = get_object_or_404(SessionRequest, id=sr_id, skill__owner=request.user)
+        if action == 'accept':
+            sr.status = SessionRequest.STATUS_ACCEPTED
+            sr.save()
+            messages.success(request, f'Accepted request from {sr.requester.get_full_name() or sr.requester.username}.')
+        elif action == 'decline':
+            sr.status = SessionRequest.STATUS_DECLINED
+            sr.save()
+            messages.success(request, f'Declined request from {sr.requester.get_full_name() or sr.requester.username}.')
+        return redirect('session_requests_inbox')
+
+    return render(request, 'accounts/session_requests_inbox.html', {
+        'incoming': incoming,
     })

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Request Session — ProND{% endblock %}
+
+{% block content %}
+<h2>Request a Session</h2>
+<p>
+    You're requesting a session from
+    <a href="{% url 'profile_detail' skill.owner.id %}">{{ skill.owner.get_full_name|default:skill.owner.username }}</a>
+    for their skill: <strong>{{ skill.name }}</strong>
+</p>
+
+<form method="post" class="mt-3" style="max-width:500px;">
+    {% csrf_token %}
+    <div class="mb-3">
+        <label class="form-label">Message (optional)</label>
+        {{ form.message }}
+    </div>
+    <button type="submit" class="btn btn-primary">Send Request</button>
+    <a href="{% url 'skill_search' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+</form>
+{% endblock %}
