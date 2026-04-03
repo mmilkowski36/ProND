@@ -126,6 +126,8 @@ def skill_search(request):
     return render(request, 'accounts/skill_search.html', {
         'query': query,
         'results': results,
+    })
+
 @login_required
 def profile_search(request):
     query = request.GET.get('q') # get the text entered into the search bar
@@ -212,6 +214,9 @@ def session_requests_inbox(request):
 
     return render(request, 'accounts/session_requests_inbox.html', {
         'incoming': incoming,
+    })
+
+@login_required
 def inbox(request):
     # find all messages sent or received
     all_messages = PrivateMessage.objects.filter(
