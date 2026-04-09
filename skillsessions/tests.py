@@ -1,6 +1,6 @@
 # AI gen tests. add/edit/delete as needed
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from django.test import TestCase, Client
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -542,3 +542,83 @@ class SessionMessageManageViewTest(TestCase):
         announcement.refresh_from_db()
         self.assertEqual(announcement.content, 'Updated announcement')
         self.assertTrue(announcement.is_announcement)
+
+
+class TimezoneHandlingTest(TestCase):
+    """Exercises UserTimezoneMiddleware end-to-end via ingestion and display."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(username='tzuser', password='testpass123')
+        self.skill = Skill.objects.create(owner=self.user, name='Python')
+        self.client.login(username='tzuser', password='testpass123')
+
+    def _post_session(self, naive_datetime_str):
+        return self.client.post(reverse('session_create'), {
+            'skill': self.skill.id,
+            'title': 'TZ Test Session',
+            'description': 'Timezone check',
+            'location': 'Room TZ',
+            'date_time': naive_datetime_str,
+            'duration_minutes': 60,
+            'capacity': 5,
+        })
+
+    def test_ingest_uses_cookie_timezone(self):
+        # July 15 → PDT (UTC-7). 14:30 Los Angeles → 21:30 UTC.
+        # Using LA (not ET) specifically so a broken cookie path would produce
+        # the wrong UTC value and fail this assertion.
+        self.client.cookies['tz'] = 'America/Los_Angeles'
+        response = self._post_session('2026-07-15T14:30')
+        self.assertEqual(response.status_code, 302)
+        session = Session.objects.latest('id')
+        expected = datetime(2026, 7, 15, 21, 30, tzinfo=dt_timezone.utc)
+        self.assertEqual(session.date_time, expected)
+
+    def test_ingest_fallback_without_cookie(self):
+        # No cookie set → middleware falls back to America/New_York.
+        # July 15 → EDT (UTC-4). 14:30 ET → 18:30 UTC.
+        response = self._post_session('2026-07-15T14:30')
+        self.assertEqual(response.status_code, 302)
+        session = Session.objects.latest('id')
+        expected = datetime(2026, 7, 15, 18, 30, tzinfo=dt_timezone.utc)
+        self.assertEqual(session.date_time, expected)
+
+    def test_ingest_fallback_on_invalid_cookie(self):
+        # Malformed path-like value exercises the ValueError branch of
+        # ZoneInfo() rather than ZoneInfoNotFoundError. Must not 500; must
+        # fall back to America/New_York.
+        self.client.cookies['tz'] = '/etc/passwd'
+        response = self._post_session('2026-07-15T14:30')
+        self.assertEqual(response.status_code, 302)
+        session = Session.objects.latest('id')
+        expected = datetime(2026, 7, 15, 18, 30, tzinfo=dt_timezone.utc)
+        self.assertEqual(session.date_time, expected)
+
+    def test_display_uses_cookie_timezone(self):
+        # Stored as 18:30 UTC; with America/New_York active it should render
+        # as 2:30 p.m. (EDT) on the session_detail page.
+        session = Session.objects.create(
+            skill=self.skill,
+            host=self.user,
+            title='Display TZ Session',
+            location='Room TZ',
+            date_time=datetime(2026, 7, 15, 18, 30, tzinfo=dt_timezone.utc),
+            duration_minutes=60,
+            capacity=5,
+        )
+        self.client.cookies['tz'] = 'America/New_York'
+        response = self.client.get(reverse('session_detail', args=[session.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '2:30')
+        self.assertNotContains(response, '18:30')
+
+    def test_dst_boundary_january(self):
+        # January 15 → PST (UTC-8), not PDT. 14:30 LA → 22:30 UTC.
+        # Confirms zoneinfo is actually picking the correct DST offset by date.
+        self.client.cookies['tz'] = 'America/Los_Angeles'
+        response = self._post_session('2026-01-15T14:30')
+        self.assertEqual(response.status_code, 302)
+        session = Session.objects.latest('id')
+        expected = datetime(2026, 1, 15, 22, 30, tzinfo=dt_timezone.utc)
+        self.assertEqual(session.date_time, expected)
