@@ -240,7 +240,7 @@ def inbox(request):
             latest_messages.append(msg)
             users_seen.add(other_user.id)
 
-    return render(request, 'accounts/inbox.html', {'messages': latest_messages})
+    return render(request, 'accounts/inbox.html', {'threads': latest_messages})
 
 @login_required
 def send_message(request, receiver_id):
