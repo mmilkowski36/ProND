@@ -70,7 +70,7 @@ class ProfileViewTest(TestCase):
     def test_profile_view_requires_login(self):
         response = self.client.get(reverse('profile_view'))
         self.assertEqual(response.status_code, 302)
-        self.assertIn('login', response.url)
+        self.assertIn('?next=', response.url)
 
     def test_profile_view_auto_creates_profile(self):
         self.client.login(username='testuser', password='testpass123')
@@ -160,7 +160,7 @@ class ProfileViewTest(TestCase):
         other_user = User.objects.create_user(username='other', password='testpass123')
         response = self.client.get(reverse('profile_detail', args=[other_user.id]))
         self.assertEqual(response.status_code, 302)
-        self.assertIn('login', response.url)
+        self.assertIn('?next=', response.url)
 
 
 class InboxRenderingTest(TestCase):
