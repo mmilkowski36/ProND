@@ -4,19 +4,56 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.utils import timezone
+from django.utils.formats import date_format
 from django.db import transaction
 from django.http import HttpResponseForbidden
+from django.views.decorators.http import require_POST
 from django.urls import reverse
-from accounts.models import Skill
+from accounts.models import Skill, PrivateMessage
 from .models import Session, SessionMembership, SessionMessage
 from .forms import SessionForm, SessionMessageForm, SessionMessageEditForm
+
+
+def notify_members_of_cancellation(session, reason):
+    """
+    Creates 1 PrivateMessage per member of the session (except host), sent from 
+    host. Returns the number of notifications created. Snapshots session title and local date/time so
+    msg survive hard-delete
+
+    Must wrap in atomic transaction 
+
+    """
+    local_dt = timezone.localtime(session.date_time)
+    when = date_format(local_dt, "M j, Y \\a\\t g:i A")
+    title = session.title
+    base = f'INFO: Session "{title}" ({when}) has been cancelled by the host.'
+    if reason:
+        body = f"{base} Reason: {reason}"
+    else:
+        body = base
+
+    members = session.memberships.select_related('user').exclude(user=session.host)
+    count = 0
+    for membership in members:
+        PrivateMessage.objects.create(
+            sender=session.host,
+            receiver=membership.user,
+            content=body,
+        )
+        count += 1
+    return count
 
 
 @login_required
 def session_list(request): # main page - list all sessions for calendar + list view
     now = timezone.now()
-    all_sessions = Session.objects.order_by('date_time').select_related('skill', 'host')
-    sessions = all_sessions.filter(date_time__gte=now, is_cancelled=False)
+    all_sessions = (
+        Session.objects
+        .filter(is_cancelled=False)
+        .order_by('date_time')
+        .select_related('skill', 'host')
+    )
+    sessions = all_sessions.filter(date_time__gte=now)
 
     # session IDs the current user has joined - one query
     joined_ids = set(
@@ -28,9 +65,7 @@ def session_list(request): # main page - list all sessions for calendar + list v
     # build calendar event list with status for each session
     calendar_events = []
     for session in all_sessions:
-        if session.is_cancelled:
-            status = 'cancelled'
-        elif session.date_time < now:
+        if session.date_time < now:
             status = 'past'
         elif session.host == request.user:
             status = 'hosting'
@@ -81,6 +116,13 @@ def session_detail(request, pk): # view session details. conditional buttons bas
         Session.objects.select_related('skill', 'host'),
         pk=pk
     )
+    if session.is_cancelled:
+        return render(
+            request,
+            'sessions/session_cancelled.html',
+            {'session_title': session.title},
+            status=410,
+        )
     memberships = session.memberships.select_related('user')
     session_messages = session.messages.select_related('author')
     membership_count = memberships.count()
@@ -118,6 +160,10 @@ def session_join(request, pk): # POST only - join session if not host, not alrea
     if request.method != 'POST':
         return redirect('session_detail', pk=pk)
 
+    if session.is_cancelled:
+        messages.error(request, 'This session has been cancelled.')
+        return redirect('session_list')
+
     if request.user == session.host:
         messages.error(request, 'You cannot join your own session.')
         return redirect('session_detail', pk=pk)
@@ -149,6 +195,10 @@ def session_leave(request, pk): # POST only - leave session as member
     if request.method != 'POST':
         return redirect('session_detail', pk=pk)
 
+    if session.is_cancelled:
+        messages.error(request, 'This session has been cancelled.')
+        return redirect('session_list')
+
     membership = session.memberships.filter(user=request.user).first()
     if membership:
         membership.delete()
@@ -165,6 +215,10 @@ def session_message_create(request, pk):
 
     if request.method != 'POST':
         return redirect('session_detail', pk=pk)
+
+    if session.is_cancelled:
+        messages.error(request, 'This session has been cancelled.')
+        return redirect('session_list')
 
     if not session.user_can_access_chat(request.user):
         messages.error(request, 'Join this session before using the chat.')
@@ -199,6 +253,10 @@ def session_message_edit(request, pk, message_id):
         session_id=pk,
     )
 
+    if session_message.session.is_cancelled:
+        messages.error(request, 'This session has been cancelled.')
+        return redirect('session_list')
+
     if not session_message.user_can_manage(request.user):
         return HttpResponseForbidden('You can only edit your own messages.')
 
@@ -232,6 +290,10 @@ def session_message_delete(request, pk, message_id):
         session_id=pk,
     )
 
+    if session_message.session.is_cancelled:
+        messages.error(request, 'This session has been cancelled.')
+        return redirect('session_list')
+
     if not session_message.user_can_manage(request.user):
         return HttpResponseForbidden('You can only delete your own messages.')
 
@@ -242,14 +304,31 @@ def session_message_delete(request, pk, message_id):
     return redirect('session_detail', pk=pk)
 
 @login_required
-def cancel_session(request, session_id):
-    session = get_object_or_404(Session, id=session_id)
+@require_POST
+def cancel_session(request, pk):
+    session = get_object_or_404(Session, pk=pk)
 
     if session.host != request.user:
         return HttpResponseForbidden("You cannot cancel this session.")
 
-    session.is_cancelled = True
-    session.cancelled_at = timezone.now()
-    session.save()
+    if session.is_cancelled:
+        messages.info(request, "This session is already cancelled.")
+        return redirect("session_list")
 
-    return redirect("session_detail", pk=session.id)
+    reason = request.POST.get('reason', '').strip()[:500]
+
+    with transaction.atomic():
+        notified_count = notify_members_of_cancellation(session, reason)
+        session.is_cancelled = True
+        session.cancelled_at = timezone.now()
+        session.save()
+
+    if notified_count > 0:
+        messages.success(
+            request,
+            f'Session cancelled. {notified_count} member(s) were notified.',
+        )
+    else:
+        messages.success(request, 'Session cancelled.')
+
+    return redirect("session_list")
