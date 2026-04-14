@@ -6,6 +6,7 @@ from django.utils import timezone
 class Profile(models.Model): # Profile model - contains user info + bio, 1:1 relation with django User
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile') #1:1 relation with User model, cascade delete if user deleted
     bio = models.TextField(blank=True)
+    photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -30,6 +31,30 @@ class Skill(models.Model): # Skill model - contains your "skills" that are assoc
     def __str__(self):
         return f"{self.name}"
 
+
+class SessionRequest(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_ACCEPTED = 'accepted'
+    STATUS_DECLINED = 'declined'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_ACCEPTED, 'Accepted'),
+        (STATUS_DECLINED, 'Declined'),
+    ]
+
+    requester = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_session_requests')
+    skill = models.ForeignKey(Skill, on_delete=models.CASCADE, related_name='session_requests')
+    message = models.TextField(blank=True, max_length=500)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['requester', 'skill'], name='unique_session_request')
+        ]
+
+    def __str__(self):
+        return f"{self.requester.username} → {self.skill.name} ({self.status})"
 class PrivateMessage(models.Model):
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages') # ptr to sender
     receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages') # ptr to receiver

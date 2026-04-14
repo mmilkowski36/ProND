@@ -1,13 +1,23 @@
 from django import forms
-from .models import Profile, Skill
+from .models import Profile, Skill, SessionRequest
 
 
-class ProfileForm(forms.ModelForm): # form for editing your profile - bio only (for now)
+class ProfileForm(forms.ModelForm):
     class Meta:
         model = Profile
-        fields = ['bio']
+        fields = ['bio', 'photo']
         widgets = {
             'bio': forms.Textarea(attrs={'rows': 4, 'class': 'form-control'}),
+            'photo': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+        }
+
+
+class SessionRequestForm(forms.ModelForm):
+    class Meta:
+        model = SessionRequest
+        fields = ['message']
+        widgets = {
+            'message': forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'Optional message to the skill owner...'}),
         }
 
 
