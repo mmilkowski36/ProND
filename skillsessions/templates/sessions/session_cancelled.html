@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Session cancelled — ProND{% endblock %}
+{% block content %}
+  <div class="alert alert-warning">
+    <h3>This session has been cancelled</h3>
+    {% if session_title %}
+      <p>"{{ session_title }}" is no longer available.</p>
+    {% endif %}
+    <p>
+      Redirecting to your sessions in
+      <span id="cancelled-countdown" aria-live="polite">5</span> seconds.
+      <a href="{% url 'session_list' %}">Go now</a>.
+    </p>
+  </div>
+  <script>
+    (function() {
+      var n = 5;
+      var el = document.getElementById('cancelled-countdown');
+      var timer = setInterval(function() {
+        n -= 1;
+        if (el) el.textContent = n;
+        if (n <= 0) {
+          clearInterval(timer);
+          window.location.replace("{% url 'session_list' %}");
+        }
+      }, 1000);
+    })();
+  </script>
+{% endblock %}

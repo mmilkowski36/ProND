@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.db import IntegrityError
 from django.urls import reverse
 from django.utils import timezone
-from .models import Profile, Skill
+from .models import Profile, Skill, PrivateMessage
 
 
 
@@ -70,7 +70,7 @@ class ProfileViewTest(TestCase):
     def test_profile_view_requires_login(self):
         response = self.client.get(reverse('profile_view'))
         self.assertEqual(response.status_code, 302)
-        self.assertIn('login', response.url)
+        self.assertIn('?next=', response.url)
 
     def test_profile_view_auto_creates_profile(self):
         self.client.login(username='testuser', password='testpass123')
@@ -160,4 +160,53 @@ class ProfileViewTest(TestCase):
         other_user = User.objects.create_user(username='other', password='testpass123')
         response = self.client.get(reverse('profile_detail', args=[other_user.id]))
         self.assertEqual(response.status_code, 302)
-        self.assertIn('login', response.url)
+        self.assertIn('?next=', response.url)
+
+
+class InboxRenderingTest(TestCase):
+    """Regression tests: inbox context key must not shadow django.contrib.messages."""
+
+    def setUp(self):
+        self.client = Client()
+        self.alice = User.objects.create_user(username='alice', password='testpass123')
+        self.bob = User.objects.create_user(username='bob', password='testpass123')
+
+    def test_inbox_renders_without_crash_when_empty(self):
+        self.client.login(username='alice', password='testpass123')
+        response = self.client.get(reverse('inbox'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'My Messages')
+
+    def test_inbox_renders_private_messages(self):
+        PrivateMessage.objects.create(
+            sender=self.bob, receiver=self.alice, content='Hello Alice'
+        )
+        self.client.login(username='alice', password='testpass123')
+        response = self.client.get(reverse('inbox'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Hello Alice')
+        self.assertContains(response, 'bob')
+
+    def test_inbox_does_not_shadow_flash_messages(self):
+        """
+        The real test of the shadowing bug: a flash enqueued on a prior
+        request must still render on /inbox/. If the view's context key is
+        'messages', it overrides django.contrib.messages and the flash text
+        never reaches the template.
+        """
+        PrivateMessage.objects.create(
+            sender=self.bob, receiver=self.alice, content='some private msg'
+        )
+        self.client.login(username='alice', password='testpass123')
+        # Enqueue a flash by triggering the profile_edit save_bio path
+        self.client.post(
+            reverse('profile_edit'),
+            {'action': 'save_bio', 'bio': 'new bio text'},
+        )
+        # Next request should render the pending flash
+        response = self.client.get(reverse('inbox'))
+        self.assertEqual(response.status_code, 200)
+        # If 'messages' was shadowed, base.html iterates PrivateMessage
+        # objects instead of real flash messages, so 'Profile updated.'
+        # never appears in the rendered page.
+        self.assertContains(response, 'Profile updated.')
