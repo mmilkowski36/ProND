@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2> Explore Popular Skill Sharers! </h2>
+{% for sharer in sharers %}
+<div class="card mb-3">
+    <div class="card-body">
+        <h5 class="card-title"> {{sharer.username}} </h5>
+        {% if sharer.profile %}
+            <p class="text-muted"> {{sharer.profile.bio }} </p>
+        {% endif %}
+        {% for skill in sharer.skills.all %}
+        <span class="badge bg-secondary">{{skill.name}}</span>
+        {% empty %}
+            <p class="text-muted"> No skills listed. </p>
+        {% endfor %}
+        <br>
+        <a href="{% url 'profile_detail' sharer.id %}" class="btn btn-primary btn-sm mt-2"> View Profile </a>
+    </div>
+</div>
+{% endfor %}
+
+{% endblock %}
