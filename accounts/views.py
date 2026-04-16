@@ -10,6 +10,7 @@ from django.db.models import Q, Max
 from django.contrib.auth.models import User
 from .models import Profile, Skill, PrivateMessage
 from .forms import ProfileForm, SkillForm
+from skillsessions.models import Session
 def login_page(request):
     if request.user.is_authenticated:
         return redirect('session_list')
@@ -133,18 +134,33 @@ def profile_search(request):
     query = request.GET.get('q') # get the text entered into the search bar
     if query:
         # search by username, first name, or last name using Q module
-        results = User.objects.filter(
+        name_results = User.objects.filter(
             # dynamically generate Q objects
             # {field}__icontains
             Q(username__icontains=query) |
             Q(first_name__icontains=query) |
             Q(last_name__icontains=query)
         ).distinct() # get only one
+
+        skill_results = Skill.objects.filter(
+            name__icontains=query
+            ).select_related('owner')
+
+        session_results = Session.objects.filter(
+            Q(title__icontains=query) |
+            Q(description__icontains=query),
+            is_cancelled=False
+            ).select_related('host', 'skill')
     else:
-        results = User.objects.none() # return none instead of crashing
+        name_results = User.objects.none()
+        skill_results = Skill.objects.none()
+        session_results = Session.objects.none()
+
 
     return render(request, 'accounts/search_results.html', {
-        'results': results,
+        'name_results': name_results,
+        'skill_results': skill_results,
+        'session_results': session_results,
         'query': query
     })
 
