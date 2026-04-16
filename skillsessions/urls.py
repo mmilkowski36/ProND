@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path('', views.session_list, name='session_list'),
     path('create/', views.session_create, name='session_create'),
+    path('sharer/<int:user_id>/', views.sharer_session_list, name='sharer_session_list'),
     path('<int:pk>/', views.session_detail, name='session_detail'),
     path('<int:pk>/messages/', views.session_message_create, name='session_message_create'),
     path('<int:pk>/messages/<int:message_id>/edit/', views.session_message_edit, name='session_message_edit'),

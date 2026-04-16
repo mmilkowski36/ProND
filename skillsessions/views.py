@@ -3,6 +3,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.contrib.auth.models import User
 from django.utils import timezone
 from django.utils.formats import date_format
 from django.db import transaction
@@ -84,6 +85,33 @@ def session_list(request): # main page - list all sessions for calendar + list v
     return render(request, 'sessions/session_list.html', {
         'sessions': sessions,
         'calendar_events': calendar_events,
+        'page_title': 'Upcoming Sessions',
+        'show_calendar': True,
+        'empty_message': 'No upcoming sessions.',
+    })
+
+
+@login_required
+def sharer_session_list(request, user_id):
+    sharer = get_object_or_404(User, id=user_id)
+    sessions = (
+        Session.objects
+        .filter(
+            host=sharer,
+            is_cancelled=False,
+            date_time__gte=timezone.now(),
+        )
+        .order_by('date_time')
+        .select_related('skill', 'host')
+    )
+
+    return render(request, 'sessions/session_list.html', {
+        'sessions': sessions,
+        'calendar_events': [],
+        'page_title': f'Upcoming Sessions with {sharer.get_full_name() or sharer.username}',
+        'show_calendar': False,
+        'sharer': sharer,
+        'empty_message': f'{sharer.get_full_name() or sharer.username} has no upcoming sessions right now.',
     })
 
 

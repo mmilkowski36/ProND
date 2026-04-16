@@ -26,7 +26,10 @@ class Skill(models.Model): # Skill model - contains your "skills" that are assoc
         ]
 
     def has_upcoming_sessions(self): # boolean check if skill has upcoming sessions - can block deletion if True
-        return self.sessions.filter(date_time__gte=timezone.now()).exists()
+        return self.sessions.filter(
+            date_time__gte=timezone.now(),
+            is_cancelled=False,
+        ).exists()
 
     def __str__(self):
         return f"{self.name}"

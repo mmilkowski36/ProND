@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Search Skills — ProND{% endblock %}
+{% block title %}Search Skills - ProND{% endblock %}
 
 {% block content %}
 <h2>Search Skills</h2>
@@ -42,7 +42,7 @@
                     {% endif %}
 
                     {% if r.has_sessions %}
-                    <p class="text-success small mb-2">Has upcoming sessions — <a href="{% url 'session_list' %}">browse sessions</a></p>
+                    <p class="text-success small mb-2">Has upcoming sessions - <a href="{% url 'sharer_session_list' r.owner.id %}">view this sharer's sessions</a></p>
                     {% else %}
                     <p class="text-muted small mb-2">No upcoming sessions yet.</p>
                     {% endif %}
