@@ -3,8 +3,9 @@
 {% block title %}Sessions — ProND{% endblock %}
 
 {% block content %}
-<h2>Upcoming Sessions</h2>
+<h2>{{ page_title|default:"Upcoming Sessions" }}</h2>
 
+{% if show_calendar|default:True %}
 <div class="d-flex gap-3 mb-2">
     <span><span style="display:inline-block;width:12px;height:12px;background:#0d6efd;border-radius:2px"></span> Hosting</span>
     <span><span style="display:inline-block;width:12px;height:12px;background:#198754;border-radius:2px"></span> Joined</span>
@@ -35,6 +36,9 @@
         cal.render();
     });
 </script>
+{% elif sharer %}
+<p class="text-muted">Showing only future sessions hosted by <a href="{% url 'profile_detail' sharer.id %}">{{ sharer.get_full_name|default:sharer.username }}</a>.</p>
+{% endif %}
 
 {% if sessions %}
 {% for session in sessions %}
@@ -57,6 +61,11 @@
 </div>
 {% endfor %}
 {% else %}
-<p>No upcoming sessions. <a href="{% url 'session_create' %}">Create one!</a></p>
+<p>
+    {{ empty_message|default:"No upcoming sessions." }}
+    {% if show_calendar|default:True %}
+    <a href="{% url 'session_create' %}">Create one!</a>
+    {% endif %}
+</p>
 {% endif %}
 {% endblock %}

@@ -203,6 +203,48 @@ class SessionListViewTest(TestCase):
         self.assertIn(future, response.context['sessions'])
         self.assertNotIn(past, response.context['sessions'])
 
+    def test_sharer_session_list_filters_to_specific_host(self):
+        self.client.login(username='testuser', password='testpass123')
+        other_user = User.objects.create_user(username='otherhost', password='testpass123')
+        other_skill = Skill.objects.create(owner=other_user, name='Guitar')
+
+        target_session = Session.objects.create(
+            skill=self.skill, host=self.user, title='Mine',
+            location='Room 1', date_time=timezone.now() + timedelta(days=1),
+            duration_minutes=60, capacity=5,
+        )
+        other_session = Session.objects.create(
+            skill=other_skill, host=other_user, title='Not Mine',
+            location='Room 2', date_time=timezone.now() + timedelta(days=1),
+            duration_minutes=60, capacity=5,
+        )
+
+        response = self.client.get(reverse('sharer_session_list', args=[self.user.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(target_session, response.context['sessions'])
+        self.assertNotIn(other_session, response.context['sessions'])
+        self.assertFalse(response.context['show_calendar'])
+
+    def test_sharer_session_list_hides_cancelled_sessions(self):
+        self.client.login(username='testuser', password='testpass123')
+        visible = Session.objects.create(
+            skill=self.skill, host=self.user, title='Visible Session',
+            location='Room 1', date_time=timezone.now() + timedelta(days=1),
+            duration_minutes=60, capacity=5,
+        )
+        cancelled = Session.objects.create(
+            skill=self.skill, host=self.user, title='Cancelled Session',
+            location='Room 2', date_time=timezone.now() + timedelta(days=2),
+            duration_minutes=60, capacity=5,
+            is_cancelled=True,
+            cancelled_at=timezone.now(),
+        )
+
+        response = self.client.get(reverse('sharer_session_list', args=[self.user.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(visible, response.context['sessions'])
+        self.assertNotIn(cancelled, response.context['sessions'])
+
 
 class SessionCreateViewTest(TestCase):
     def setUp(self):

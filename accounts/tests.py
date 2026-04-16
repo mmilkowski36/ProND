@@ -61,6 +61,22 @@ class SkillModelTest(TestCase):
         Skill.objects.create(owner=self.other_user, name='Python')
         self.assertEqual(Skill.objects.filter(name='Python').count(), 2)
 
+    def test_has_upcoming_sessions_ignores_cancelled_sessions(self):
+        from skillsessions.models import Session
+        skill = Skill.objects.create(owner=self.user, name='Guitar')
+        Session.objects.create(
+            skill=skill,
+            host=self.user,
+            title='Cancelled Future Session',
+            location='Room 1',
+            date_time=timezone.now() + timedelta(days=1),
+            duration_minutes=60,
+            capacity=5,
+            is_cancelled=True,
+            cancelled_at=timezone.now(),
+        )
+        self.assertFalse(skill.has_upcoming_sessions())
+
 
 class ProfileViewTest(TestCase):
     def setUp(self):
