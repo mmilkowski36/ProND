@@ -15,9 +15,29 @@ class ProfileForm(forms.ModelForm):
 class SessionRequestForm(forms.ModelForm):
     class Meta:
         model = SessionRequest
-        fields = ['message']
+        fields = [
+            'proposed_title',
+            'proposed_date_time',
+            'proposed_duration_minutes',
+            'proposed_location',
+            'proposed_capacity',
+            'message',
+        ]
         widgets = {
+            'proposed_title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ex: Piano Lesson'}),
+            'proposed_date_time': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'proposed_duration_minutes': forms.NumberInput(attrs={'class': 'form-control', 'min': 5, 'placeholder': 'ex: 60'}),
+            'proposed_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'ex: Zoom'}),
+            'proposed_capacity': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'placeholder': 'ex: 2'}),
             'message': forms.Textarea(attrs={'rows': 3, 'class': 'form-control', 'placeholder': 'Optional message to the skill owner...'}),
+        }
+        labels = {
+            'proposed_title': 'Session Title',
+            'proposed_date_time': 'Proposed Date & Time',
+            'proposed_duration_minutes': 'Duration (minutes)',
+            'proposed_location': 'Location',
+            'proposed_capacity': 'Max Attendees',
+            'message': 'Message (optional)',
         }
 
 

@@ -17,11 +17,13 @@
 
 <h4>Skills</h4>
 {% if skills %}
-<ul>
+<ul class="list-unstyled">
     {% for skill in skills %}
-    <li>
-        <strong>{{ skill.name }}</strong>
-        {% if skill.description %} — {{ skill.description }}{% endif %}
+    <li class="d-flex align-items-center gap-3 mb-3">
+        <span> <strong>{{ skill.name }}</strong> {% if skill.description %} | {{ skill.description }}{% endif %}</span>
+        {% if user.is_authenticated and user != profile_user %}
+        <a href="{% url 'session_request_create' skill.id %}" class="btn btn-outline-success btn-sm">Request Session</a>
+        {% endif %}
     </li>
     {% endfor %}
 </ul>

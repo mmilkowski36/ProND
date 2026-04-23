@@ -15,6 +15,14 @@
 
 <hr>
 
+<h5>Add a Skill</h5>
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="add_skill">
+    {{ skill_form.as_p }}
+    <button type="submit" class="btn btn-success">Add Skill</button>
+</form>
+<hr>
 <h4>Skills</h4>
 {% if skills %}
 <ul>
@@ -35,11 +43,4 @@
 <p>No skills added yet.</p>
 {% endif %}
 
-<h5>Add a Skill</h5>
-<form method="post">
-    {% csrf_token %}
-    <input type="hidden" name="action" value="add_skill">
-    {{ skill_form.as_p }}
-    <button type="submit" class="btn btn-success">Add Skill</button>
-</form>
 {% endblock %}

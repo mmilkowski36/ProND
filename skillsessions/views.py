@@ -10,7 +10,7 @@ from django.db import transaction
 from django.http import HttpResponseForbidden
 from django.views.decorators.http import require_POST
 from django.urls import reverse
-from accounts.models import Skill, PrivateMessage
+from accounts.models import Skill, PrivateMessage, SessionRequest
 from .models import Session, SessionMembership, SessionMessage
 from .forms import SessionForm, SessionMessageForm, SessionMessageEditForm
 
@@ -122,6 +122,13 @@ def session_create(request): # create own session page - select own skill from d
         messages.warning(request, 'You must add a Skill before creating a Session.')
         return redirect('profile_edit')
 
+    # Resolve a linked sr (from inbox Accept link)
+    # If from a request
+    sr = None
+    from_request_id = request.POST.get('from_request') or request.GET.get('from_request')
+    if from_request_id:
+        sr = get_object_or_404(SessionRequest, id=from_request_id, skill__owner=request.user)
+
     if request.method == 'POST':
         form = SessionForm(request.POST)
         form.fields['skill'].queryset = user_skills
@@ -129,13 +136,40 @@ def session_create(request): # create own session page - select own skill from d
             session = form.save(commit=False)
             session.host = request.user
             session.save()
+            if sr:
+                sr.status = SessionRequest.STATUS_ACCEPTED
+                sr.save()
+                PrivateMessage.objects.create(
+                    sender=request.user,
+                    receiver=sr.requester,
+                    content=(
+                        f'Your session request for "{sr.skill.name}" was accepted! '
+                        f'"{session.title}" is scheduled for {session.date_time.strftime("%b %d, %Y at %I:%M %p")} '
+                        f'at {session.location}. Find it on the Sessions page and join. '
+                        'If you cannot make the new appointment, please message me here so I can cancel it!'
+                    )
+                )
             messages.success(request, f'Session "{session.title}" created.')
             return redirect('session_detail', pk=session.pk)
     else:
-        form = SessionForm()
+        initial = {}
+        if sr:
+            if sr.skill:
+                initial['skill'] = sr.skill
+            if sr.proposed_title:
+                initial['title'] = sr.proposed_title
+            if sr.proposed_date_time:
+                initial['date_time'] = sr.proposed_date_time
+            if sr.proposed_duration_minutes:
+                initial['duration_minutes'] = sr.proposed_duration_minutes
+            if sr.proposed_location:
+                initial['location'] = sr.proposed_location
+            if sr.proposed_capacity:
+                initial['capacity'] = sr.proposed_capacity
+        form = SessionForm(initial=initial)
         form.fields['skill'].queryset = user_skills
 
-    return render(request, 'sessions/session_create.html', {'form': form})
+    return render(request, 'sessions/session_create.html', {'form': form, 'sr': sr})
 
 
 @login_required

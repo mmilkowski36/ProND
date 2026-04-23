@@ -51,17 +51,25 @@ class SessionRequest(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # From requester to recommend to skill sharer
+    # All the info we need + message to create a session is here
+    proposed_title = models.CharField(max_length=200, blank=True)
+    proposed_date_time = models.DateTimeField(null=True, blank=True)
+    proposed_duration_minutes = models.PositiveIntegerField(null=True, blank=True)
+    proposed_location = models.CharField(max_length=200, blank=True)
+    proposed_capacity = models.PositiveIntegerField(null=True, blank=True)
+
     class Meta:
-        constraints = [
-            models.UniqueConstraint(fields=['requester', 'skill'], name='unique_session_request')
-        ]
+        pass
 
     def __str__(self):
         return f"{self.requester.username} → {self.skill.name} ({self.status})"
+
 class PrivateMessage(models.Model):
     sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages') # ptr to sender
     receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_messages') # ptr to receiver
     content = models.TextField()
     timestamp = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
     def __str__(self):
         return f"From {self.sender} to {self.receiver}"

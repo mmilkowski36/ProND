@@ -1,7 +1,5 @@
 {% extends "base.html" %}
-
 {% block title %}Search Results — ProND{% endblock %}
-
 {% block content %}
 {% if query %}
 <h2 class="mb-4">Search Results for "{{ query }}"</h2>
@@ -13,17 +11,35 @@
 
 <h4 class="mb-3">People</h4>
 {% if name_results %}
-    <div class="list-group mb-4">
+<div class="row row-cols-1 row-cols-md-3 g-3">
         {% for user in name_results %}
-            <a href="{% url 'profile_detail' user.id %}" class="list-group-item list-group-item-action">
-                <div class="d-flex w-100 justify-content-between">
-                    <h5 class="mb-1">{{ user.get_full_name|default:user.username }}</h5>
-                    <small>@{{ user.username }}</small>
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2">
+                        {% if user.profile.photo %}
+                            <img src="{{user.profile.photo.url}}" alt="Profile photo" class="rounded-circle me-3" style="width:80px;height:80px;object-fit:cover;">
+                        {% endif %}
+                        <h5 class="card-title"> {{user.username}}</h5>
+                    </div>
+                    {% if user.profile %}
+                        <p class="text-muted"> {{user.profile.bio}}</p>
+                    {% endif %}
+                    {% for skill in user.skills.all %}
+                        <small class="text-muted"> Skills </small>
+                        <span class="badge bg-success"> {{skill.name}} </span>
+                    {% empty %}
+                        <small class="text-muted"> No skills listed. </small>
+                    {% endfor %}
+                    <br>
                 </div>
-                <p class="mb-1">Skills: {{ user.skills.all|join:", " }}</p>
-            </a>
+                <div class="card-footer">
+                    <a href="{% url 'profile_detail' user.id %}" class="btn btn-outline-primary btn-sm"> View Profile</a>
+                </div>
+            </div>
+        </div>
         {% endfor %}
-    </div>
+</div>
 {% else %}
     <div class="alert alert-warning mb-4">No profiles found matching your search.</div>
 {% endif %}

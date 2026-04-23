@@ -173,7 +173,7 @@ def session_request_create(request, skill_id):
         messages.error(request, "You can't request a session for your own skill.")
         return redirect('skill_search')
 
-    if SessionRequest.objects.filter(requester=request.user, skill=skill).exists():
+    if SessionRequest.objects.filter(requester=request.user, skill=skill, status=SessionRequest.STATUS_PENDING).exists():
         messages.error(request, 'You already sent a request for this skill.')
         return redirect('skill_search')
 
@@ -214,18 +214,15 @@ def session_requests_inbox(request):
         .order_by('-created_at')
     )
 
+    # Michael Note: Deleted the 'accept' status because its no longer a form and instead a link.
+    # Link takes host to session creation page.
+    # We only have decline now.
     if request.method == 'POST':
         sr_id = request.POST.get('request_id')
-        action = request.POST.get('action')
         sr = get_object_or_404(SessionRequest, id=sr_id, skill__owner=request.user)
-        if action == 'accept':
-            sr.status = SessionRequest.STATUS_ACCEPTED
-            sr.save()
-            messages.success(request, f'Accepted request from {sr.requester.get_full_name() or sr.requester.username}.')
-        elif action == 'decline':
-            sr.status = SessionRequest.STATUS_DECLINED
-            sr.save()
-            messages.success(request, f'Declined request from {sr.requester.get_full_name() or sr.requester.username}.')
+        sr.status = SessionRequest.STATUS_DECLINED
+        sr.save()
+        messages.success(request, f'Declined request from {sr.requester.get_full_name() or sr.requester.username}.')
         return redirect('session_requests_inbox')
 
     return render(request, 'accounts/session_requests_inbox.html', {

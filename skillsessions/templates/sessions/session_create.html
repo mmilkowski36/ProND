@@ -4,8 +4,21 @@
 
 {% block content %}
 <h2>Create a Session</h2>
-<form method="post">
+
+{% if sr %}
+<div class="alert alert-info mb-3">
+    <strong>{{ sr.requester.get_full_name|default:sr.requester.username }}</strong>'s request.
+    Review and adjust anything before creating.
+</div>
+{% endif %}
+
+<form method="post" style="max-width:560px;">
     {% csrf_token %}
+
+    {% if sr %}
+    <input type="hidden" name="from_request" value="{{ sr.id }}">
+    {% endif %}
+
     {{ form.as_p }}
     <button type="submit" class="btn btn-primary">Create Session</button>
     <a href="{% url 'session_list' %}" class="btn btn-secondary">Cancel</a>
