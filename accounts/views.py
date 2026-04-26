@@ -87,7 +87,7 @@ def profile_detail(request, user_id): # view other profile - pretty basic, read 
     skills = Skill.objects.filter(owner=profile_user)
     upcoming_sessions = (
         Session.objects
-        .filter(host=profile_user, date_time__gte=timezone.now(), is_cancelled=False)
+        .filter(host=profile_user, date_time__gte=timezone.now(), is_cancelled=False, is_private=False)
         .select_related('skill')
         .order_by('date_time')
     )
@@ -167,7 +167,8 @@ def profile_search(request):
         session_results = Session.objects.filter(
             Q(title__icontains=query) |
             Q(description__icontains=query),
-            is_cancelled=False
+            is_cancelled=False,
+            is_private=False,
             ).select_related('host', 'skill')
     else:
         name_results = User.objects.none()
@@ -224,11 +225,16 @@ def session_request_cancel(request, request_id):
 
 @login_required
 def session_requests_inbox(request):
-    # requests sent to the current user (as skill owner)
     incoming = (
         SessionRequest.objects
         .filter(skill__owner=request.user, status=SessionRequest.STATUS_PENDING)
         .select_related('requester', 'skill')
+        .order_by('-created_at')
+    )
+    outgoing = (
+        SessionRequest.objects
+        .filter(requester=request.user, status=SessionRequest.STATUS_PENDING)
+        .select_related('skill', 'skill__owner')
         .order_by('-created_at')
     )
 
@@ -247,17 +253,35 @@ def session_requests_inbox(request):
                 date_time=sr.proposed_date_time,
                 duration_minutes=sr.proposed_duration_minutes,
                 capacity=sr.proposed_capacity,
+                is_private=True,
             )
             SessionMembership.objects.create(session=session, user=sr.requester)
+            host_name = request.user.get_full_name() or request.user.username
+            PrivateMessage.objects.create(
+                sender=request.user,
+                receiver=sr.requester,
+                content=(
+                    f'Your session request for "{sr.skill.name}" was accepted by {host_name}! '
+                    f'You\'ve been added to "{session.title}" on {session.date_time.strftime("%b %d, %Y at %I:%M %p")}. '
+                    f'Check your Sessions page to view it.'
+                ),
+            )
             sr.delete()
             messages.success(request, f'Accepted! Session "{session.title}" created and {requester_name} has been added.')
         elif action == 'decline':
+            host_name = request.user.get_full_name() or request.user.username
+            PrivateMessage.objects.create(
+                sender=request.user,
+                receiver=sr.requester,
+                content=f'Your session request for "{sr.skill.name}" was declined by {host_name}.',
+            )
             sr.delete()
             messages.success(request, f'Declined request from {requester_name}.')
         return redirect('session_requests_inbox')
 
     return render(request, 'accounts/session_requests_inbox.html', {
         'incoming': incoming,
+        'outgoing': outgoing,
     })
 
 @login_required
